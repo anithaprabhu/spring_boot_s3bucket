@@ -1,0 +1,13 @@
+amazonProperties:
+  endpointUrl: https://s3.us-east-1.amazonaws.com 
+  bucketName: ani-multipart-test1 
+  uploadAccessKey: AKIAZYBQMLIIR22HMX4R
+  uploadSecretKey: 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
+  downloadAccessKey: AKIAZYBQMLIIRLERZUUX
+  downloadSecretKey: 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
+   
+spring:
+  http:
+     multipart:
+         maxFileSize: 200MB
+         maxRequestSize: 215MB	    
