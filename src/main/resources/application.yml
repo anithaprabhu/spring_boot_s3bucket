@@ -1,10 +1,10 @@
 amazonProperties:
   endpointUrl: https://s3.us-east-1.amazonaws.com 
   bucketName: ani-multipart-test1 
-  uploadAccessKey: AKIAZYBQMLIIR22HMX4R
-  uploadSecretKey: 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
-  downloadAccessKey: AKIAZYBQMLIIRLERZUUX
-  downloadSecretKey: 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
+  longTermAccessKey: <accessk key>
+  longTermSecretKey: <secret key>
+  s3UploadRole: arn:aws:iam::123456789012:role/ani_s3_full_access
+  s3DownloadRole: arn:aws:iam::123456789012:role/ani_s3_read_only
    
 spring:
   http:

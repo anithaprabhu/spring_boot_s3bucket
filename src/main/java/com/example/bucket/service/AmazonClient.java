@@ -2,6 +2,7 @@ package com.example.bucket.service;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.BasicSessionCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 //import com.amazonaws.services.s3.model.CannedAccessControlList;
@@ -12,6 +13,9 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 //import com.amazonaws.services.s3.model.S3ObjectInputStream;
 //import com.amazonaws.util.IOUtils;
+import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClient;
+import com.amazonaws.services.securitytoken.model.AssumeRoleRequest;
+import com.amazonaws.services.securitytoken.model.AssumeRoleResult;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,7 @@ public class AmazonClient {
     private String endpointUrl;
     @Value("${amazonProperties.bucketName}")
     private String bucketName;
+    /**
     @Value("${amazonProperties.uploadAccessKey}")
     private String uploadAccessKey;
     @Value("${amazonProperties.uploadSecretKey}")
@@ -44,14 +49,70 @@ public class AmazonClient {
     private String downloadAccessKey;
     @Value("${amazonProperties.downloadSecretKey}")
     private String downloadSecretKey;
+    **/
+    @Value("${amazonProperties.longTermAccessKey}")
+    private String longTermAccessKey;
+    @Value("${amazonProperties.longTermSecretKey}")
+    private String longTermSecretKey;
+    @Value("${amazonProperties.s3UploadRole}")
+    private String s3UploadRole;
+    @Value("${amazonProperties.s3DownloadRole}")
+    private String s3DownloadRole;
+   // private static final String ROLE_ARN = "arn:aws:iam::670116370961:role/S3_FullAccess_ToMaha";
   
 
     @PostConstruct
     private void initializeAmazon() {
-        AWSCredentials uploadCredentials = new BasicAWSCredentials(this.uploadAccessKey, this.uploadSecretKey);
-        this.s3uploadclient = new AmazonS3Client(uploadCredentials);
-        AWSCredentials downloadCredentials = new BasicAWSCredentials(this.downloadAccessKey, this.downloadSecretKey);
-        this.s3downloadclient = new AmazonS3Client(downloadCredentials);
+       // AWSCredentials uploadCredentials = new BasicAWSCredentials(this.uploadAccessKey, this.uploadSecretKey);
+       // this.s3uploadclient = new AmazonS3Client(uploadCredentials);
+        //AWSCredentials downloadCredentials = new BasicAWSCredentials(this.downloadAccessKey, this.downloadSecretKey);
+        //this.s3downloadclient = new AmazonS3Client(downloadCredentials);
+        
+        // Step 1. Use anitha-s3-user long-term credentials to call the
+        // AWS Security Token Service (STS) AssumeRole API, specifying
+        // the ARN for the role S3_FullAccess_ToMaha to s3 bucket - ani-multipart-test1.
+        	AWSCredentials longTermCredentials_ = new BasicAWSCredentials(this.longTermAccessKey, this.longTermSecretKey);
+            AWSSecurityTokenServiceClient stsClient = new
+                AWSSecurityTokenServiceClient(longTermCredentials_);
+           
+            AssumeRoleRequest assumeUploadRequest = new AssumeRoleRequest()
+                .withRoleArn(s3UploadRole)
+                .withDurationSeconds(3600)
+                .withExternalId("anitha_admin")
+                .withRoleSessionName("demo");
+           
+            AssumeRoleResult assumeUploadResult =
+            stsClient.assumeRole(assumeUploadRequest);
+            
+            AssumeRoleRequest assumeDownloadRequest = new AssumeRoleRequest()
+                    .withRoleArn(s3DownloadRole)
+                    .withDurationSeconds(3600)
+                    .withExternalId("anitha_admin")
+                    .withRoleSessionName("demo");
+               
+                AssumeRoleResult assumeDownloadResult =
+                stsClient.assumeRole(assumeDownloadRequest);
+
+        // Step 2. AssumeRole returns temporary security credentials for
+        // the IAM role.
+
+            BasicSessionCredentials temporaryUploadCredentials =
+            new BasicSessionCredentials(
+            		assumeUploadResult.getCredentials().getAccessKeyId(),
+            		assumeUploadResult.getCredentials().getSecretAccessKey(),
+            		assumeUploadResult.getCredentials().getSessionToken());
+            
+            BasicSessionCredentials temporaryDownloadCredentials =
+                    new BasicSessionCredentials(
+                    		assumeDownloadResult.getCredentials().getAccessKeyId(),
+                    		assumeDownloadResult.getCredentials().getSecretAccessKey(),
+                    		assumeDownloadResult.getCredentials().getSessionToken());
+                    
+            // Step 3. Make S3 API service calls to access S3 bucket
+        // using the temporary security credentials for the Assumed Role
+        // that were returned in the previous step.
+            this.s3uploadclient = new AmazonS3Client(temporaryUploadCredentials);
+            this.s3downloadclient = new AmazonS3Client(temporaryDownloadCredentials);
     }
 
     public String uploadFile(MultipartFile multipartFile) {
@@ -77,7 +138,8 @@ public class AmazonClient {
     }
 
     private String generateFileName(MultipartFile multiPart) {
-        return new Date().getTime() + "-" + multiPart.getOriginalFilename().replace(" ", "_");
+       // return new Date().getTime() + "-" + multiPart.getOriginalFilename().replace(" ", "_");
+    	 return multiPart.getOriginalFilename().replace(" ", "_");
     }
 
     private void uploadFileTos3bucket(String fileName, File file) {
